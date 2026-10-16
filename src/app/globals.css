@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Work Sans Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-display: "Shrikhand", Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "Cascadia Code", monospace;
+  --color-ink: #101011;
+  --color-panel: #18171a;
+  --color-accent: #e0533f;
+  --color-accent-soft: #d4af37;
+  --color-cream: #e7d7c1;
+  --color-tomato: #c0392b;
+  --color-gold: #d4af37;
+}
+
+:root {
+  color-scheme: dark;
+  --color-white: #f3e9da;
+  --color-zinc-50: oklch(97% 0.008 75);
+  --color-zinc-100: oklch(94% 0.012 75);
+  --color-zinc-200: oklch(90% 0.016 75);
+  --color-zinc-300: oklch(84% 0.018 75);
+  --color-zinc-400: oklch(71% 0.018 75);
+  --color-zinc-500: oklch(57% 0.016 75);
+  --color-zinc-600: oklch(45% 0.014 75);
+  --color-zinc-700: oklch(36% 0.012 75);
+  --color-zinc-800: oklch(27% 0.01 75);
+  --color-zinc-900: oklch(21% 0.008 75);
+  --color-zinc-950: oklch(15% 0.006 75);
+  --lens-shadow: drop-shadow(0 10px 14px rgb(0 0 0 / 0.6));
+  --viewer-bg: radial-gradient(ellipse at 50% 20%, #262321, #101011 70%);
+}
+
+/*
+ * Day mode. Components are written with dark-theme utility classes
+ * (text-white, bg-white/5, text-zinc-400 …); flipping the palette variables
+ * those utilities read from turns them into their light-theme equivalents.
+ */
+html.light {
+  color-scheme: light;
+  --color-white: #101011;
+  --color-black: #fffaf2;
+  --color-zinc-50: oklch(15% 0.008 60);
+  --color-zinc-100: oklch(21% 0.01 60);
+  --color-zinc-200: oklch(27% 0.012 60);
+  --color-zinc-300: oklch(33% 0.014 60);
+  --color-zinc-400: oklch(43% 0.018 60);
+  --color-zinc-500: oklch(52% 0.02 60);
+  --color-zinc-600: oklch(63% 0.022 65);
+  --color-zinc-700: oklch(76% 0.024 70);
+  --color-zinc-800: oklch(86% 0.024 75);
+  --color-zinc-900: oklch(91% 0.02 75);
+  --color-zinc-950: oklch(95% 0.014 75);
+  --color-ink: #ede2d1;
+  --color-panel: #f8f1e6;
+  --color-accent: #c0392b;
+  --color-accent-soft: #8a6a12;
+  --lens-shadow: drop-shadow(0 10px 12px rgb(60 30 0 / 0.25));
+  --viewer-bg: radial-gradient(ellipse at 50% 25%, #fbf5ec, #e6d8c3 75%);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-zinc-200);
+  font-family: var(--font-sans);
+  transition: background-color 0.3s;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+::selection {
+  background: rgb(192 57 43 / 0.35);
+}
+
+.lens-shadow {
+  filter: var(--lens-shadow);
+}
+.viewer-bg {
+  background: var(--viewer-bg);
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-white/[0.07] bg-white/[0.025] shadow-[inset_0_1px_0_0_rgb(255_255_255/0.04)];
+  }
+  html.light .panel {
+    @apply border-black/0 bg-panel shadow-[0_1px_2px_rgb(0_0_0/0.05),0_0_0_1px_rgb(0_0_0/0.07)];
+  }
+  .panel-hover {
+    @apply transition-colors hover:border-white/20;
+  }
+  html.light .panel-hover:hover {
+    @apply shadow-[0_1px_2px_rgb(0_0_0/0.05),0_0_0_1px_rgb(0_0_0/0.22)];
+  }
+  .eyebrow {
+    @apply text-xs font-medium text-zinc-500;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1 text-xs text-zinc-300 transition hover:border-white/25 hover:text-white;
+  }
+  .chip-active {
+    @apply border-accent/70 bg-accent/15 text-accent-soft hover:border-accent hover:text-accent-soft;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition active:scale-[0.98];
+  }
+  .btn-primary {
+    @apply bg-tomato text-cream hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply border border-white/10 bg-white/[0.04] text-zinc-200 hover:border-white/20 hover:bg-white/[0.08];
+  }
+}
+
+/* Range sliders */
+input[type="range"] {
+  width: 100%;
+  appearance: none;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+  --fill: 0%;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-accent) var(--fill), rgb(128 128 128 / 0.25) var(--fill));
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgb(128 128 128 / 0.25);
+}
+input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid var(--color-accent);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.35);
+  transition: transform 0.15s;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid var(--color-accent);
+}
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+/* Two overlapping range inputs; only the thumbs take pointer events. */
+.dual-range input[type="range"] {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.dual-range input[type="range"]::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.dual-range input[type="range"]::-moz-range-track,
+.dual-range input[type="range"]::-moz-range-progress {
+  background: transparent;
+}
+.dual-range input[type="range"]::-webkit-slider-thumb {
+  pointer-events: auto;
+}
+.dual-range input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+}
+
+/* Thin scrollbars for the filter sidebar */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(128 128 128 / 0.3) transparent;
+}

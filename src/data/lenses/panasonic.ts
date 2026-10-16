@@ -1,0 +1,36 @@
+import { defineLenses } from "./define";
+
+export const panasonic = defineLenses("panasonic", { m: ["L"], fmt: "FF", af: true }, [
+  // Lumix S (L-Mount)
+  { n: "Lumix S PRO 16-35mm F4", s: "S PRO", f: [16, 35], a: 4, d: 85, l: 100, w: 500, fl: 77, y: 2019, p: 1399 },
+  { n: "Lumix S 14-28mm F4-5.6 Macro", f: [14, 28], a: 4, d: 83.1, l: 89.2, w: 345, fl: 77, y: 2022, p: 749, c: ["macro"] },
+  { n: "Lumix S 18-40mm F4.5-6.3", f: [18, 40], a: 4.5, d: 67.9, l: 40.9, w: 155, fl: 58, y: 2024, p: 449, ext: 15 },
+  { n: "Lumix S PRO 24-70mm F2.8", s: "S PRO", f: [24, 70], a: 2.8, d: 90.4, l: 130.6, w: 935, fl: 82, y: 2019, p: 2199, ext: 25 },
+  { n: "Lumix S 24-105mm F4 Macro OIS", f: [24, 105], a: 4, d: 84, l: 118, w: 680, fl: 77, y: 2019, p: 1299, c: ["macro"], ext: true },
+  { n: "Lumix S 28-200mm F4-7.1 Macro OIS", f: [28, 200], a: 4, d: 73.4, l: 93.4, w: 413, fl: 67, y: 2023, p: 799, c: ["macro"], ext: 60 },
+  { n: "Lumix S PRO 70-200mm F2.8 OIS", s: "S PRO", f: [70, 200], a: 2.8, d: 94.4, l: 208.6, w: 1570, fl: 82, y: 2019, p: 2599 },
+  { n: "Lumix S 70-300mm F4.5-5.6 Macro OIS", f: [70, 300], a: 4.5, d: 84, l: 148, w: 790, fl: 67, y: 2021, p: 1249, c: ["macro"], ext: 60 },
+  { n: "Lumix S 100-500mm F5-7.1 OIS", f: [100, 500], a: 5, d: 90, l: 199.5, w: 1300, fl: 77, y: 2025, p: 1899, ext: 70 },
+  { n: "Lumix S PRO 50mm F1.4", s: "S PRO", f: 50, a: 1.4, d: 90, l: 130, w: 955, fl: 77, y: 2019, p: 2299, b: 11 },
+  { n: "Lumix S 18mm F1.8", f: 18, a: 1.8, d: 73.6, l: 82, w: 310, fl: 67, y: 2022, p: 799 },
+  { n: "Lumix S 24mm F1.8", f: 24, a: 1.8, d: 73.6, l: 82, w: 310, fl: 67, y: 2021, p: 599 },
+  { n: "Lumix S 35mm F1.8", f: 35, a: 1.8, d: 73.6, l: 82, w: 295, fl: 67, y: 2021, p: 599 },
+  { n: "Lumix S 50mm F1.8", f: 50, a: 1.8, d: 73.6, l: 82, w: 300, fl: 67, y: 2021, p: 449 },
+  { n: "Lumix S 85mm F1.8", f: 85, a: 1.8, d: 73.6, l: 82, w: 355, fl: 67, y: 2020, p: 599 },
+  { n: "Lumix S 100mm F2.8 Macro", f: 100, a: 2.8, d: 73.6, l: 82, w: 298, fl: 67, y: 2023, p: 999, c: ["macro"] },
+  { n: "Lumix S 26mm F8", f: 26, a: 8, aMin: 8, d: 64.5, l: 9.3, w: 23, y: 2024, p: 199, af: false, b: 0 },
+  // Lumix G / Leica DG (Micro Four Thirds)
+  { n: "Leica DG Vario-Elmarit 8-18mm F2.8-4", s: "Leica DG", m: ["M43"], fmt: "M43", f: [8, 18], a: 2.8, d: 73.4, l: 88, w: 315, fl: 67, y: 2017, p: 1099 },
+  { n: "Leica DG Vario-Elmarit 12-60mm F2.8-4", s: "Leica DG", m: ["M43"], fmt: "M43", f: [12, 60], a: 2.8, d: 68.4, l: 86, w: 320, fl: 62, y: 2017, p: 999, ext: true },
+  { n: "Leica DG Vario-Summilux 10-25mm F1.7", s: "Leica DG", m: ["M43"], fmt: "M43", f: [10, 25], a: 1.7, d: 87.6, l: 128, w: 690, fl: 77, y: 2019, p: 1799, ar: true },
+  { n: "Leica DG Vario-Summilux 25-50mm F1.7", s: "Leica DG", m: ["M43"], fmt: "M43", f: [25, 50], a: 1.7, d: 87.6, l: 127.6, w: 654, fl: 77, y: 2021, p: 1799, ar: true },
+  { n: "Leica DG Summilux 25mm F1.4 II", s: "Leica DG", m: ["M43"], fmt: "M43", f: 25, a: 1.4, d: 63, l: 54.5, w: 200, fl: 46, y: 2022, p: 699, ar: true, b: 7 },
+  { n: "Leica DG Nocticron 42.5mm F1.2", s: "Leica DG", m: ["M43"], fmt: "M43", f: 42.5, a: 1.2, d: 74, l: 76.8, w: 425, fl: 67, y: 2014, p: 1399, ar: true },
+  { n: "Lumix G 20mm F1.7 II", m: ["M43"], fmt: "M43", f: 20, a: 1.7, d: 63, l: 25.5, w: 87, fl: 46, y: 2013, p: 349, b: 7, col: "silver" },
+  { n: "Lumix G 25mm F1.7", m: ["M43"], fmt: "M43", f: 25, a: 1.7, d: 60.8, l: 52, w: 125, fl: 46, y: 2015, p: 199, b: 7 },
+  { n: "Lumix G X Vario 12-35mm F2.8 II", m: ["M43"], fmt: "M43", f: [12, 35], a: 2.8, d: 67.6, l: 73.8, w: 305, fl: 58, y: 2017, p: 999, ext: true },
+  { n: "Lumix G X Vario 35-100mm F2.8 II", m: ["M43"], fmt: "M43", f: [35, 100], a: 2.8, d: 67.4, l: 99.9, w: 357, fl: 58, y: 2017, p: 1099 },
+  { n: "Lumix G 14-140mm F3.5-5.6 II", m: ["M43"], fmt: "M43", f: [14, 140], a: 3.5, d: 67, l: 75, w: 265, fl: 58, y: 2015, p: 699, ext: 50 },
+  { n: "Lumix G 100-300mm F4-5.6 II", m: ["M43"], fmt: "M43", f: [100, 300], a: 4, d: 73.6, l: 126, w: 520, fl: 67, y: 2016, p: 649, ext: 50 },
+  { n: "Lumix G Fisheye 8mm F3.5", m: ["M43"], fmt: "M43", f: 8, a: 3.5, d: 60.7, l: 51.7, w: 165, y: 2010, p: 799, c: ["fisheye"], b: 7 },
+]);
