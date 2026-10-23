@@ -2,6 +2,8 @@
 
 A walk-through 3D camera rental shop. Browse hundreds of lenses on the shelves, pick them up, and try them on Sony FX3 and RED Komodo bodies in the back room.
 
+Live site: https://nabievxc.github.io/lens-web/
+
 ## Run locally
 
 ```bash
@@ -11,11 +13,10 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-| Command        | What it does        |
-| -------------- | ------------------- |
-| `npm run dev`  | Start the next app  |
-| `npm run build`| Production build    |
-| `npm start`    | Serve the build     |
+| Command         | What it does                     |
+| --------------- | -------------------------------- |
+| `npm run dev`   | Start the next app               |
+| `npm run build` | Static production build (`out/`) |
 
 ## Controls
 
