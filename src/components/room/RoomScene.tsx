@@ -34,7 +34,6 @@ import {
 } from "./layout";
 import { CAMERAS, CAMERA_LIST, cameraRate, fit, focalAt, type CameraId } from "./cameras";
 import { CameraWithLens, rigLength } from "./CameraModels";
-import { CameraBlur } from "./CameraBlur";
 import { Armchair, CeilingFan, CineRoom, Doorway, EdisonCluster, FloorLamp, FramedPrint, Pendant, Skylight, Wall, WallClock } from "./Decor";
 import { buildShelfGeometry, outlineGeometry } from "./proxies";
 import { neonTexture, plaster, posterTexture, railTexture, signTexture, woodFloor, woodGrain } from "./roomTextures";
@@ -84,7 +83,7 @@ const BODY_RADIUS = 0.28;
 const CROUCH_EYE = 1.0;
 const BASE_FOV = 62;
 /** How quickly the view catches up with the mouse, per second. Higher is snappier. */
-const LOOK_EASE = 24;
+const LOOK_EASE = 48;
 /** Pointer-lock movement larger than this in one event is a browser glitch, in pixels. */
 const MAX_MOUSE_STEP = 300;
 
@@ -100,12 +99,11 @@ function useShared() {
     const plinth = new THREE.MeshStandardMaterial({ color: "#1d1715", roughness: 0.7 });
     const led = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2.3, 1.5), toneMapped: false });
     const lensBody = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.35 });
-    const lensGlass = new THREE.MeshPhysicalMaterial({
+    const lensGlass = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.04,
-      metalness: 0.2,
-      clearcoat: 1,
-      envMapIntensity: 2,
+      roughness: 0.08,
+      metalness: 0.35,
+      envMapIntensity: 1.4,
     });
     const outline = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.8, 0.5), side: THREE.BackSide, toneMapped: false });
     return { walnut, walnutV, back, plinth, led, lensBody, lensGlass, outline };
@@ -905,10 +903,6 @@ function HeldLens({
     tmp.target.copy(camera.quaternion).multiply(tmp.spin);
     g.quaternion.slerpQuaternions(tmp.upright, tmp.target, ease);
 
-    // Draw the lens after everything in the room, even when it sits inside a shelf.
-    markHeld(g);
-
-
     if (dim.current) {
       dim.current.position.copy(camera.position).addScaledVector(tmp.fwd, 0.05);
       dim.current.quaternion.copy(camera.quaternion);
@@ -1086,7 +1080,7 @@ function HeldCamera({
   const size = Math.max(cam.size[0], cam.size[2] + reach) / 1000;
 
   const lcd = useMemo(() => {
-    const rt = new THREE.WebGLRenderTarget(512, 288, { samples: 2 });
+    const rt = new THREE.WebGLRenderTarget(320, 180);
     return { rt, cam: new THREE.PerspectiveCamera(40, 16 / 9, 0.02, 40) };
   }, []);
   useEffect(() => () => lcd.rt.dispose(), [lcd]);
@@ -1151,9 +1145,6 @@ function HeldCamera({
       r.position.z = start.current === state3.clock.elapsedTime ? centre : THREE.MathUtils.lerp(r.position.z, centre, 1 - Math.exp(-dt * 8));
     }
 
-    markHeld(g);
-
-
     const d = dim.current;
     if (d) {
       d.position.copy(camera.position).addScaledVector(tmp.fwd, 0.05);
@@ -1167,7 +1158,7 @@ function HeldCamera({
 
     // Live picture on the camera's own screen, rendered from the front of the lens.
     frame.current += 1;
-    if (viewing || frame.current % 2) return;
+    if (viewing || frame.current % 4) return;
     g.updateMatrixWorld();
     const f = focalAt(lens, anim.current.zoom);
     lcd.cam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(cam.sensor.h / (2 * f)));
@@ -1231,7 +1222,7 @@ function KeyLight() {
       intensity={1.9}
       color="#fff2e2"
       castShadow
-      shadow-mapSize={[4096, 4096]}
+      shadow-mapSize={[2048, 2048]}
       shadow-bias={-0.0004}
       shadow-normalBias={0.02}
       shadow-radius={4}
@@ -1240,7 +1231,7 @@ function KeyLight() {
 }
 
 /**
- * Nothing that casts a shadow moves on its own, so the 4096px shadow map is drawn once and
+ * Nothing that casts a shadow moves on its own, so the shadow map is drawn once and
  * again only when a lens or camera leaves or returns to the shelves, not every frame.
  */
 function StaticShadows({ hidden, heldCam }: { hidden: Set<string>; heldCam: CameraId | null }) {
@@ -1249,6 +1240,26 @@ function StaticShadows({ hidden, heldCam }: { hidden: Set<string>; heldCam: Came
     gl.shadowMap.autoUpdate = false;
     gl.shadowMap.needsUpdate = true;
   }, [gl, hidden, heldCam]);
+  return null;
+}
+
+/** Drop to 1× pixels if the room can't hold ~45 fps, so turning stays smooth on weaker GPUs. */
+function DropDprWhenSlow() {
+  const setDpr = useThree((s) => s.setDpr);
+  const acc = useRef({ t: 0, n: 0, low: false });
+  useFrame((_, dt) => {
+    const a = acc.current;
+    a.t += dt;
+    a.n += 1;
+    if (a.t < 0.7) return;
+    const fps = a.n / a.t;
+    a.t = 0;
+    a.n = 0;
+    if (!a.low && fps < 42) {
+      a.low = true;
+      setDpr(1);
+    }
+  });
   return null;
 }
 
@@ -1329,12 +1340,12 @@ function Scene(props: Props & { hovered: Slot | null }) {
         <Lightformer form="rect" intensity={0.5} color="#e7d7c1" position={[6, 1.5, 0]} rotation-y={-Math.PI / 2} scale={[9, 3, 1]} />
       </Environment>
 
-      <EffectComposer multisampling={4}>
-        <CameraBlur />
-        <Bloom mipmapBlur luminanceThreshold={1} luminanceSmoothing={0.2} intensity={0.55} />
+      <EffectComposer multisampling={0} enableNormalPass={false}>
+        <Bloom mipmapBlur luminanceThreshold={1.1} luminanceSmoothing={0.3} intensity={0.28} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-        <Vignette offset={0.35} darkness={0.35} />
+        <Vignette offset={0.35} darkness={0.28} />
       </EffectComposer>
+      <DropDprWhenSlow />
       <Ready onReady={props.onReady} />
     </>
   );
@@ -1343,8 +1354,9 @@ function Scene(props: Props & { hovered: Slot | null }) {
 export default function RoomScene(props: Props & { hovered: Slot | null }) {
   return (
     <Canvas
-      dpr={[1, 1.75]}
-      shadows="soft"
+      dpr={[1, 1.25]}
+      shadows
+      performance={{ min: 0.5 }}
       camera={{ fov: 62, near: 0.02, far: 40, position: [START.x, EYE, START.z] }}
       gl={{ antialias: false, stencil: false, powerPreference: "high-performance" }}
       className="!fixed inset-0 touch-none"
