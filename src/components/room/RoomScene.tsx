@@ -20,6 +20,7 @@ import {
   COUNTER,
   DOOR,
   EYE,
+  GATE,
   ROOM,
   SOFTBOXES,
   START,
@@ -28,13 +29,16 @@ import {
   UNIT_TOP,
   UNIT_WIDTH,
   WALL,
+  WARE,
+  WARE_CRATES,
   roomLayout,
   type Slot,
   type Unit,
 } from "./layout";
 import { CAMERAS, CAMERA_LIST, cameraRate, fit, focalAt, type CameraId } from "./cameras";
 import { CameraWithLens, rigLength } from "./CameraModels";
-import { Armchair, CeilingFan, CineRoom, Doorway, EdisonCluster, FloorLamp, FramedPrint, Pendant, Skylight, Wall, WallClock } from "./Decor";
+import { RAM, RamTruck, defaultVehicle, type VehiclePose } from "./RamTruck";
+import { Armchair, CeilingFan, CineRoom, Doorway, EdisonCluster, FloorLamp, FramedPrint, Pendant, Skylight, Wall, WallClock, Warehouse } from "./Decor";
 import { buildShelfGeometry, outlineGeometry } from "./proxies";
 import { neonTexture, plaster, posterTexture, railTexture, signTexture, woodFloor, woodGrain } from "./roomTextures";
 
@@ -71,6 +75,9 @@ interface Props {
   /** Pointer lock was refused (embedded browsers, some kiosks); the mouse then drags to look. */
   onLockError: () => void;
   onReady: () => void;
+  driving: boolean;
+  onHoverCar: (on: boolean) => void;
+  onEnterCar: () => void;
 }
 
 const REACH = 3.5;
@@ -364,6 +371,7 @@ const RoomShell = memo(function RoomShell() {
 });
 
 const StaticCineRoom = memo(CineRoom);
+const StaticWarehouse = memo(Warehouse);
 
 function Counter() {
   const card = useMemo(() => signTexture(["Rental desk"], { bg: "#c0392b", fg: "#e7d7c1", w: 768, h: 192 }), []);
@@ -441,15 +449,18 @@ const OBSTACLES = [
   ...SOFTBOXES.map((s) => ({ x: s.x, z: s.z, hw: 0.4, hd: 0.4 })),
   { x: APPLE_BOXES.x, z: APPLE_BOXES.z, hw: 0.3, hd: 0.2 },
   { x: ARMCHAIR.x, z: ARMCHAIR.z, hw: 0.45, hd: 0.45 },
+  ...WARE_CRATES.map((c) => ({ x: c.x, z: c.z, hw: c.hw, hd: c.hd })),
 ];
 
 /** Floor areas you can stand in: both rooms minus the shelf depth, joined by the doorway. */
 const WALKABLE = (() => {
   const r = BODY_RADIUS;
   const main = { x0: -ROOM.halfX + UNIT_DEPTH + r, x1: ROOM.halfX - UNIT_DEPTH - r, z0: -ROOM.halfZ + UNIT_DEPTH + r, z1: ROOM.halfZ - r };
-  const cine = { x0: CINE.cx - CINE.halfX + r, x1: CINE.cx + CINE.halfX - 0.3 - r, z0: CINE.cz - CINE.halfZ + UNIT_DEPTH + r, z1: CINE.cz + CINE.halfZ - r };
+  const cine = { x0: CINE.cx - CINE.halfX + r, x1: CINE.cx + CINE.halfX - r, z0: CINE.cz - CINE.halfZ + UNIT_DEPTH + r, z1: CINE.cz + CINE.halfZ - r };
   const door = { x0: main.x1, x1: cine.x0, z0: DOOR.z - DOOR.width / 2 + r, z1: DOOR.z + DOOR.width / 2 - r };
-  return [main, door, cine];
+  const gate = { x0: cine.x1, x1: WARE.cx - WARE.halfX + r, z0: GATE.z - GATE.width / 2 + r, z1: GATE.z + GATE.width / 2 - r };
+  const ware = { x0: WARE.cx - WARE.halfX + r, x1: WARE.cx + WARE.halfX - r, z0: WARE.cz - WARE.halfZ + r, z1: WARE.cz + WARE.halfZ - r };
+  return [main, door, cine, gate, ware];
 })();
 
 /** Wall slabs between the rooms, so you can't pick a lens through them. */
@@ -465,7 +476,35 @@ const WALL_BOXES = (() => {
   ];
 })();
 
-function collide(p: THREE.Vector3) {
+const GATE_BOXES = (() => {
+  const x0 = CINE.cx + CINE.halfX;
+  const x1 = x0 + WALL;
+  const a = GATE.z - GATE.width / 2;
+  const b = GATE.z + GATE.width / 2;
+  return [
+    new THREE.Box3(new THREE.Vector3(x0, 0, CINE.cz - CINE.halfZ), new THREE.Vector3(x1, CINE.height, a)),
+    new THREE.Box3(new THREE.Vector3(x0, 0, b), new THREE.Vector3(x1, CINE.height, CINE.cz + CINE.halfZ)),
+    new THREE.Box3(new THREE.Vector3(x0, GATE.height, a), new THREE.Vector3(x1, CINE.height, b)),
+  ];
+})();
+
+function pushOut(p: THREE.Vector3, o: { x: number; z: number; hw: number; hd: number }) {
+  const cx = THREE.MathUtils.clamp(p.x, o.x - o.hw, o.x + o.hw);
+  const cz = THREE.MathUtils.clamp(p.z, o.z - o.hd, o.z + o.hd);
+  const dx = p.x - cx;
+  const dz = p.z - cz;
+  const d = Math.hypot(dx, dz);
+  if (d < BODY_RADIUS) {
+    if (d < 1e-5) {
+      p.z = o.z + o.hd + BODY_RADIUS;
+    } else {
+      p.x = cx + (dx / d) * BODY_RADIUS;
+      p.z = cz + (dz / d) * BODY_RADIUS;
+    }
+  }
+}
+
+function collide(p: THREE.Vector3, vehicle?: VehiclePose | null) {
   let bestX = p.x;
   let bestZ = p.z;
   let bestD = Infinity;
@@ -481,21 +520,54 @@ function collide(p: THREE.Vector3) {
   }
   p.x = bestX;
   p.z = bestZ;
-  for (const o of OBSTACLES) {
-    const cx = THREE.MathUtils.clamp(p.x, o.x - o.hw, o.x + o.hw);
-    const cz = THREE.MathUtils.clamp(p.z, o.z - o.hd, o.z + o.hd);
-    const dx = p.x - cx;
-    const dz = p.z - cz;
-    const d = Math.hypot(dx, dz);
-    if (d < BODY_RADIUS) {
-      if (d < 1e-5) {
-        p.z = o.z + o.hd + BODY_RADIUS;
+  for (const o of OBSTACLES) pushOut(p, o);
+  if (vehicle) {
+    const c = Math.cos(vehicle.yaw);
+    const s = Math.sin(vehicle.yaw);
+    const dx = p.x - vehicle.x;
+    const dz = p.z - vehicle.z;
+    const lx = c * dx - s * dz;
+    const lz = s * dx + c * dz;
+    const hw = RAM.width / 2 + 0.08;
+    const hd = RAM.length / 2 + 0.08;
+    if (Math.abs(lx) < hw + BODY_RADIUS && Math.abs(lz) < hd + BODY_RADIUS) {
+      const ox = hw + BODY_RADIUS - Math.abs(lx);
+      const oz = hd + BODY_RADIUS - Math.abs(lz);
+      if (ox < oz) {
+        const nlx = Math.sign(lx || 1) * (hw + BODY_RADIUS);
+        p.x = vehicle.x + c * nlx + s * lz;
+        p.z = vehicle.z - s * nlx + c * lz;
       } else {
-        p.x = cx + (dx / d) * BODY_RADIUS;
-        p.z = cz + (dz / d) * BODY_RADIUS;
+        const nlz = Math.sign(lz || 1) * (hd + BODY_RADIUS);
+        p.x = vehicle.x + c * lx + s * nlz;
+        p.z = vehicle.z - s * lx + c * nlz;
       }
     }
   }
+}
+
+function collideVehicle(v: VehiclePose) {
+  const pad = 3.15;
+  v.x = THREE.MathUtils.clamp(v.x, WARE.cx - WARE.halfX + pad, WARE.cx + WARE.halfX - pad);
+  v.z = THREE.MathUtils.clamp(v.z, WARE.cz - WARE.halfZ + pad, WARE.cz + WARE.halfZ - pad);
+  VEH_TMP.set(v.x, 0, v.z);
+  const r = 1.35;
+  for (const c of WARE_CRATES) {
+    const cx = THREE.MathUtils.clamp(VEH_TMP.x, c.x - c.hw, c.x + c.hw);
+    const cz = THREE.MathUtils.clamp(VEH_TMP.z, c.z - c.hd, c.z + c.hd);
+    const dx = VEH_TMP.x - cx;
+    const dz = VEH_TMP.z - cz;
+    const d = Math.hypot(dx, dz);
+    if (d < r) {
+      if (d < 1e-5) VEH_TMP.z = c.z + c.hd + r;
+      else {
+        VEH_TMP.x = cx + (dx / d) * r;
+        VEH_TMP.z = cz + (dz / d) * r;
+      }
+    }
+  }
+  v.x = VEH_TMP.x;
+  v.z = VEH_TMP.z;
 }
 
 interface PickBox {
@@ -503,7 +575,10 @@ interface PickBox {
   box: THREE.Box3;
 }
 
-type Target = { kind: "lens"; slot: Slot } | { kind: "cam"; id: CameraId };
+type Target = { kind: "lens"; slot: Slot } | { kind: "cam"; id: CameraId } | { kind: "car" };
+
+const CAR_HIT = new THREE.Box3();
+const VEH_TMP = new THREE.Vector3();
 
 /** Pick boxes around the cameras on the display table. */
 const CAM_BOXES = CAMERA_LIST.map((c) => {
@@ -511,11 +586,14 @@ const CAM_BOXES = CAMERA_LIST.map((c) => {
   return { id: c.id, box: new THREE.Box3(new THREE.Vector3(x - 0.17, y, z - 0.17), new THREE.Vector3(x + 0.17, y + 0.24, z + 0.17)) };
 });
 
-function pick(ray: THREE.Ray, boxes: PickBox[], hidden: Set<string>, hiddenCam: CameraId | null): Target | null {
+function pick(ray: THREE.Ray, boxes: PickBox[], hidden: Set<string>, hiddenCam: CameraId | null, vehicle: VehiclePose, hideCar: boolean): Target | null {
   let best: Target | null = null;
   let bestD = REACH;
   const hit = new THREE.Vector3();
   for (const w of WALL_BOXES) {
+    if (ray.intersectBox(w, hit)) bestD = Math.min(bestD, hit.distanceTo(ray.origin));
+  }
+  for (const w of GATE_BOXES) {
     if (ray.intersectBox(w, hit)) bestD = Math.min(bestD, hit.distanceTo(ray.origin));
   }
   for (const b of boxes) {
@@ -535,11 +613,24 @@ function pick(ray: THREE.Ray, boxes: PickBox[], hidden: Set<string>, hiddenCam: 
       best = { kind: "cam", id: c.id };
     }
   }
+  if (!hideCar) {
+    CAR_HIT.min.set(vehicle.x - 3, 0, vehicle.z - 3);
+    CAR_HIT.max.set(vehicle.x + 3, 2.15, vehicle.z + 3);
+    if (ray.intersectBox(CAR_HIT, hit)) {
+      const d = hit.distanceTo(ray.origin);
+      if (d < bestD) best = { kind: "car" };
+    }
+  }
   return best;
 }
 
-const sameTarget = (a: Target | null, b: Target | null) =>
-  a === b || (!!a && !!b && (a.kind === "lens" ? b.kind === "lens" && a.slot === b.slot : b.kind === "cam" && a.id === b.id));
+const sameTarget = (a: Target | null, b: Target | null) => {
+  if (a === b) return true;
+  if (!a || !b || a.kind !== b.kind) return false;
+  if (a.kind === "lens") return b.kind === "lens" && a.slot === b.slot;
+  if (a.kind === "cam") return b.kind === "cam" && a.id === b.id;
+  return true;
+};
 
 interface HeldView {
   yaw: number;
@@ -557,34 +648,85 @@ function Player({
   touch,
   controls,
   heldView,
+  driving,
+  vehicle,
   onHover,
   onGrab,
   onHoverCam,
   onGrabCam,
+  onHoverCar,
+  onEnterCar,
   onViewZoom,
   onLockChange,
   onLockError,
 }: Pick<
   Props,
-  "active" | "hidden" | "viewfinder" | "touch" | "controls" | "onHover" | "onGrab" | "onHoverCam" | "onGrabCam" | "onViewZoom" | "onLockChange" | "onLockError"
+  | "active"
+  | "hidden"
+  | "viewfinder"
+  | "touch"
+  | "controls"
+  | "driving"
+  | "onHover"
+  | "onGrab"
+  | "onHoverCam"
+  | "onGrabCam"
+  | "onHoverCar"
+  | "onEnterCar"
+  | "onViewZoom"
+  | "onLockChange"
+  | "onLockError"
 > & {
   /** Something is in your hands and the mouse turns it rather than your head. */
   held: boolean;
   hiddenCam: CameraId | null;
   boxes: PickBox[];
   heldView: React.RefObject<HeldView>;
+  vehicle: React.RefObject<VehiclePose>;
 }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const gl = useThree((s) => s.gl);
   const keys = useRef(new Set<string>());
-  const look = useRef({ yaw: START.yaw, pitch: -0.06 });
+  const look = useRef({ yaw: START.yaw as number, pitch: -0.06 as number });
   const hover = useRef<Target | null>(null);
   const walk = useRef(0);
   const crouch = useRef(false);
   const fallbackRef = useRef(false);
   const viewing = viewfinder !== null;
-  const live = useRef({ active, held, viewing, hidden, hiddenCam, onHover, onGrab, onHoverCam, onGrabCam, onViewZoom, onLockChange, onLockError });
-  live.current = { active, held, viewing, hidden, hiddenCam, onHover, onGrab, onHoverCam, onGrabCam, onViewZoom, onLockChange, onLockError };
+  const live = useRef({
+    active,
+    held,
+    viewing,
+    driving,
+    hidden,
+    hiddenCam,
+    onHover,
+    onGrab,
+    onHoverCam,
+    onGrabCam,
+    onHoverCar,
+    onEnterCar,
+    onViewZoom,
+    onLockChange,
+    onLockError,
+  });
+  live.current = {
+    active,
+    held,
+    viewing,
+    driving,
+    hidden,
+    hiddenCam,
+    onHover,
+    onGrab,
+    onHoverCam,
+    onGrabCam,
+    onHoverCar,
+    onEnterCar,
+    onViewZoom,
+    onLockChange,
+    onLockError,
+  };
   const fovGoal = useRef(BASE_FOV);
   fovGoal.current = viewfinder ?? BASE_FOV;
   const hoverSetter = useRef<(t: Target | null) => void>(() => {});
@@ -615,28 +757,36 @@ function Player({
       },
     };
 
-    const canPick = () => live.current.active && !live.current.held && !live.current.viewing;
+    const canPick = () => live.current.active && !live.current.held && !live.current.viewing && !live.current.driving;
     const setHover = (t: Target | null) => {
       if (sameTarget(hover.current, t)) return;
       const was = hover.current;
       hover.current = t;
       if (t?.kind === "lens" || was?.kind === "lens") live.current.onHover(t?.kind === "lens" ? t.slot : null);
       if (t?.kind === "cam" || was?.kind === "cam") live.current.onHoverCam(t?.kind === "cam" ? t.id : null);
+      if (t?.kind === "car" || was?.kind === "car") live.current.onHoverCar(t?.kind === "car");
     };
     hoverSetter.current = setHover;
     const grab = (t: Target) => {
       setHover(null);
       if (t.kind === "lens") live.current.onGrab(t.slot);
-      else live.current.onGrabCam(t.id);
+      else if (t.kind === "cam") live.current.onGrabCam(t.id);
+      else live.current.onEnterCar();
     };
-    const pickAt = (r: THREE.Ray) => pick(r, boxes, live.current.hidden, live.current.hiddenCam);
+    const pickAt = (r: THREE.Ray) => pick(r, boxes, live.current.hidden, live.current.hiddenCam, vehicle.current, live.current.driving);
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (live.current.active && (e.ctrlKey || e.metaKey) && /^Key[WASDE]$/.test(e.code)) e.preventDefault();
       if (e.ctrlKey && /^Key/.test(e.code)) return;
       keys.current.add(e.code);
       // A toggle rather than a hold: holding Ctrl while pressing W would close the tab.
-      if ((e.code === "ControlLeft" || e.code === "ControlRight" || e.code === "KeyC") && !e.repeat && live.current.active && !live.current.held) {
+      if (
+        (e.code === "ControlLeft" || e.code === "ControlRight" || e.code === "KeyC") &&
+        !e.repeat &&
+        live.current.active &&
+        !live.current.held &&
+        !live.current.driving
+      ) {
         crouch.current = !crouch.current;
       }
       if (e.code === "KeyE" && !e.repeat && canPick() && hover.current) {
@@ -753,17 +903,82 @@ function Player({
       el.removeEventListener("pointerup", onUp);
       el.removeEventListener("wheel", onWheel);
     };
-  }, [gl, camera, boxes, controls, heldView]);
+  }, [gl, camera, boxes, controls, heldView, vehicle]);
 
   const fwd = useMemo(() => new THREE.Vector3(), []);
   const right = useMemo(() => new THREE.Vector3(), []);
   const want = useMemo(() => new THREE.Vector3(), []);
   const vel = useRef(new THREE.Vector3());
-  const smooth = useRef({ yaw: START.yaw, pitch: -0.06 });
+  const smooth = useRef({ yaw: START.yaw as number, pitch: -0.06 as number });
   const ray = useMemo(() => new THREE.Ray(), []);
+  const wasDriving = useRef(false);
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
+    const { active: on, held: h, hidden: hid, driving: inCar } = live.current;
+    const car = vehicle.current;
+
+    if (inCar && on) {
+      const keys2 = keys.current;
+      const t = touch.current;
+      const throttle = (keys2.has("KeyW") || keys2.has("ArrowUp") ? 1 : 0) + (t?.y ?? 0);
+      const reverse = keys2.has("KeyS") || keys2.has("ArrowDown") ? 1 : 0;
+      const steerIn = (keys2.has("KeyA") || keys2.has("ArrowLeft") ? 1 : 0) - (keys2.has("KeyD") || keys2.has("ArrowRight") ? 1 : 0) - (t?.x ?? 0);
+      const boost = keys2.has("ShiftLeft") || keys2.has("ShiftRight") ? 1.45 : 1;
+      const steerMax = 0.62 * (1 - Math.min(0.55, Math.abs(car.speed) / 22));
+      car.steer = THREE.MathUtils.damp(car.steer, THREE.MathUtils.clamp(steerIn, -1, 1) * steerMax, 8, dt);
+      if (throttle > 0) car.speed += 9 * boost * Math.min(1, throttle) * dt;
+      else if (reverse && car.speed > 0.2) car.speed -= 16 * dt;
+      else if (reverse) car.speed -= 7 * dt;
+      car.speed -= car.speed * 1.6 * dt;
+      car.speed = THREE.MathUtils.clamp(car.speed, -6, 16 * boost);
+      if (Math.abs(car.speed) < 0.02 && throttle <= 0 && !reverse) car.speed = 0;
+      car.yaw += (car.speed / RAM.wheelbase) * Math.tan(car.steer) * dt;
+      car.x += -Math.sin(car.yaw) * car.speed * dt;
+      car.z += -Math.cos(car.yaw) * car.speed * dt;
+      collideVehicle(car);
+
+      if (!wasDriving.current) {
+        look.current.yaw = car.yaw;
+        look.current.pitch = -0.06;
+        smooth.current.yaw = car.yaw;
+        smooth.current.pitch = -0.06;
+      }
+      wasDriving.current = true;
+      vel.current.set(0, 0, 0);
+
+      const sm = smooth.current;
+      const k = 1 - Math.exp(-dt * LOOK_EASE);
+      sm.yaw += (look.current.yaw - sm.yaw) * k;
+      sm.pitch += (look.current.pitch - sm.pitch) * k;
+      let rel = sm.yaw - car.yaw;
+      rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+      rel = THREE.MathUtils.clamp(rel, -1.15, 1.15);
+      look.current.yaw = car.yaw + rel;
+      sm.yaw = car.yaw + rel;
+      sm.pitch = THREE.MathUtils.clamp(sm.pitch, -0.45, 0.55);
+      camera.rotation.set(sm.pitch, car.yaw + rel, 0, "YXZ");
+      const c = Math.cos(car.yaw);
+      const s = Math.sin(car.yaw);
+      camera.position.set(car.x + c * RAM.seat.x + s * RAM.seat.z, RAM.seat.y, car.z - s * RAM.seat.x + c * RAM.seat.z);
+      if (hover.current) hoverSetter.current(null);
+      return;
+    }
+
+    if (wasDriving.current) {
+      wasDriving.current = false;
+      car.speed = 0;
+      car.steer = 0;
+      const c = Math.cos(car.yaw);
+      const s = Math.sin(car.yaw);
+      camera.position.set(car.x - c * 1.75, EYE, car.z + s * 1.75);
+      collide(camera.position, car);
+      look.current.yaw = car.yaw;
+      look.current.pitch = -0.06;
+      smooth.current.yaw = car.yaw;
+      smooth.current.pitch = -0.06;
+    }
+
     // The view eases towards where the mouse points, which irons out jittery mouse input.
     const sm = smooth.current;
     const k = 1 - Math.exp(-dt * LOOK_EASE);
@@ -771,7 +986,6 @@ function Player({
     sm.pitch += (look.current.pitch - sm.pitch) * k;
     const { yaw, pitch } = sm;
     camera.rotation.set(pitch, yaw, 0, "YXZ");
-    const { active: on, held: h, hidden: hid } = live.current;
 
     const v = vel.current;
     want.set(0, 0, 0);
@@ -796,7 +1010,7 @@ function Player({
     const moving = pace > 0.15;
     if (pace > 0.001) {
       camera.position.addScaledVector(v, dt);
-      collide(camera.position);
+      collide(camera.position, car);
       walk.current += dt * pace * 3.2;
     }
     const eye = crouch.current ? CROUCH_EYE : EYE;
@@ -812,7 +1026,7 @@ function Player({
     if (picking && document.pointerLockElement === gl.domElement) {
       camera.getWorldDirection(ray.direction);
       ray.origin.copy(camera.position);
-      hoverSetter.current(pick(ray, boxes, hid, live.current.hiddenCam));
+      hoverSetter.current(pick(ray, boxes, hid, live.current.hiddenCam, car, false));
     } else if (hover.current && !picking) {
       hoverSetter.current(null);
     }
@@ -1282,6 +1496,7 @@ function Scene(props: Props & { hovered: Slot | null }) {
   const { units, slots, table } = roomLayout();
   const m = useShared();
   const heldView = useRef<HeldView>({ yaw: 0.75, pitch: 0.28, dist: 0.5 });
+  const vehicle = useRef<VehiclePose>(defaultVehicle());
   const byUnit = useMemo(() => units.map((u) => slots.filter((s) => s.unit === u.id)), [units, slots]);
   const boxes = useMemo<PickBox[]>(
     () =>
@@ -1302,6 +1517,8 @@ function Scene(props: Props & { hovered: Slot | null }) {
 
       <RoomShell />
       <StaticCineRoom />
+      <StaticWarehouse />
+      <RamTruck pose={vehicle} />
       {units.map((u, i) => (
         <ShelfUnit key={u.id} unit={u} slots={byUnit[i]} hidden={props.hidden} m={m} />
       ))}
@@ -1323,10 +1540,14 @@ function Scene(props: Props & { hovered: Slot | null }) {
         touch={props.touch}
         controls={props.controls}
         heldView={heldView}
+        driving={props.driving}
+        vehicle={vehicle}
         onHover={props.onHover}
         onGrab={props.onGrab}
         onHoverCam={props.onHoverCam}
         onGrabCam={props.onGrabCam}
+        onHoverCar={props.onHoverCar}
+        onEnterCar={props.onEnterCar}
         onViewZoom={props.onViewZoom}
         onLockChange={props.onLockChange}
         onLockError={props.onLockError}
@@ -1357,7 +1578,7 @@ export default function RoomScene(props: Props & { hovered: Slot | null }) {
       dpr={[1, 1.25]}
       shadows
       performance={{ min: 0.5 }}
-      camera={{ fov: 62, near: 0.02, far: 40, position: [START.x, EYE, START.z] }}
+      camera={{ fov: 62, near: 0.02, far: 90, position: [START.x, EYE, START.z] }}
       gl={{ antialias: false, stencil: false, powerPreference: "high-performance" }}
       className="!fixed inset-0 touch-none"
     >

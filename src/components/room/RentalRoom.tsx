@@ -48,6 +48,8 @@ export function RentalRoom() {
   const [heldCam, setHeldCam] = useState<HeldCamState | null>(null);
   const [viewing, setViewing] = useState(false);
   const [aspect, setAspect] = useState(16 / 9);
+  const [hoverCar, setHoverCar] = useState(false);
+  const [driving, setDriving] = useState(false);
 
   const bag = useRental();
   const targets = useRef<SceneTargets>({ zoom: 0, focus: 1, closed: 0, demo: false });
@@ -55,8 +57,8 @@ export function RentalRoom() {
   const controls = useRef<RoomControls | null>(null);
   const heldRef = useRef(held);
   heldRef.current = held;
-  const camRef = useRef({ heldCam, viewing });
-  camRef.current = { heldCam, viewing };
+  const camRef = useRef({ heldCam, viewing, driving });
+  camRef.current = { heldCam, viewing, driving };
 
   const hidden = useMemo(() => {
     const s = new Set(bag);
@@ -133,6 +135,16 @@ export function RentalRoom() {
     if (!window.matchMedia("(pointer: coarse)").matches) controls.current?.lock();
   }, []);
 
+  const enterCar = useCallback(() => {
+    setHoverCar(false);
+    setDriving(true);
+  }, []);
+
+  const exitCar = useCallback(() => {
+    setDriving(false);
+    if (!window.matchMedia("(pointer: coarse)").matches) controls.current?.lock();
+  }, []);
+
   const setViewfinder = useCallback((on: boolean) => {
     setViewing(on);
     targets.current.demo = false;
@@ -157,7 +169,11 @@ export function RentalRoom() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || (e.target instanceof HTMLInputElement && e.target.type !== "range")) return;
-      const { heldCam: cam, viewing: v } = camRef.current;
+      const { heldCam: cam, viewing: v, driving: drive } = camRef.current;
+      if (drive) {
+        if (e.code === "KeyE" || e.code === "Escape" || e.code === "KeyQ") exitCar();
+        return;
+      }
       if (cam) {
         if (e.code === "KeyV") setViewfinder(!v);
         else if (v && (e.code === "KeyQ" || e.code === "Escape")) setViewfinder(false);
@@ -170,7 +186,7 @@ export function RentalRoom() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [release, releaseCam, setViewfinder]);
+  }, [release, releaseCam, setViewfinder, exitCar]);
 
   const onLockChange = useCallback((on: boolean) => {
     setLocked(on);
@@ -196,7 +212,7 @@ export function RentalRoom() {
   const total = bagLenses.reduce((sum, l) => sum + dayRate(l), 0);
   const inside = phase === "inside";
   const camOnly = !!heldCam && !viewing;
-  const busy = !!held || camOnly;
+  const busy = !!held || camOnly || driving;
   const showPause = inside && !busy && !viewing && !locked && !touchDevice && !noLock;
   const dragMode = touchDevice || noLock;
 
@@ -221,17 +237,22 @@ export function RentalRoom() {
           onLockChange={onLockChange}
           onLockError={() => setNoLock(true)}
           onReady={() => setSceneReady(true)}
+          driving={driving}
+          onHoverCar={setHoverCar}
+          onEnterCar={enterCar}
         />
       )}
 
       {/* Crosshair and the tag for whatever it is pointing at */}
       {inside && !busy && !viewing && locked && (
         <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <div className={`h-2 w-2 rounded-full border border-black/40 transition ${hovered || hoverCam ? "scale-150 bg-[#d4af37]" : "bg-[#e7d7c1]"}`} />
+          <div className={`h-2 w-2 rounded-full border border-black/40 transition ${hovered || hoverCam || hoverCar ? "scale-150 bg-[#d4af37]" : "bg-[#e7d7c1]"}`} />
         </div>
       )}
       {inside && !busy && !viewing && hovered && <HoverTag slot={hovered} />}
       {inside && !busy && !viewing && hoverCam && <CameraTag id={hoverCam} />}
+      {inside && !busy && !viewing && hoverCar && <CarTag />}
+      {inside && driving && <DriveHUD touch={dragMode} onExit={exitCar} />}
 
       {inside && heldCam && viewing && (
         <ViewfinderHUD
@@ -378,8 +399,9 @@ function Intro({ progress, ready, onEnter, touch }: { progress: number; ready: b
         <p className="mt-2 font-display text-xl text-[#c0392b] sm:text-2xl">a rental shop you can walk through</p>
         <p className="mt-6 max-w-md text-[15px] leading-relaxed text-[#e7d7c1]/80">
           {LENSES.length} lenses on the shelves, from Sony G Masters to Sirui anamorphics. Cine glass and the cameras are in
-          the back room, through the door on the right. Take a lens down, turn it in your hands and put it in your bag, or pick
-          up a Sony FX3 or a RED Komodo, mount any lens that fits and look through it.
+          the back room, through the door on the right. Keep going through the next door into the 1000 m² warehouse — a RAM TRX
+          is parked there. Sit in it with E and drive with WASD. Take a lens down, turn it in your hands, or pick up a Sony FX3
+          or a RED Komodo and look through it.
         </p>
 
         <div className="mt-8 grid grid-cols-2 gap-x-8 gap-y-2 text-left text-sm text-[#e7d7c1]/80">
@@ -419,6 +441,10 @@ function Intro({ progress, ready, onEnter, touch }: { progress: number; ready: b
                 <Key>V</Key>
               </span>
               <span>look through a camera</span>
+              <span>
+                <Key>E</Key>
+              </span>
+              <span>sit in the RAM, then WASD to drive</span>
             </>
           )}
         </div>
@@ -458,6 +484,60 @@ function HoverTag({ slot }: { slot: Slot }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function CarTag() {
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-1/2 mt-6 -translate-x-1/2">
+      <div className="min-w-56 rounded-xl border-2 border-[#d4af37]/60 bg-[#101011]/85 px-4 py-3 text-center backdrop-blur">
+        <div className="text-[11px] text-[#d4af37]">RAM</div>
+        <div className="text-sm font-semibold text-[#e7d7c1]">1500 TRX</div>
+        <div className="mt-1 text-xs text-[#e7d7c1]/70">Crew cab · warehouse runner</div>
+        <div className="mt-2 text-[11px] text-[#e7d7c1]/80">
+          <Key>E</Key> or click to sit and drive
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DriveHUD({ touch, onExit }: { touch: boolean; onExit: () => void }) {
+  return (
+    <>
+      <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded-full bg-[#101011]/75 px-5 py-2 text-xs text-[#e7d7c1]/85 backdrop-blur">
+          {touch ? (
+            <span>Pad to steer and throttle · get out with the button</span>
+          ) : (
+            <>
+              <span>
+                <Key>W</Key> gas <Key>S</Key> brake / reverse
+              </span>
+              <span>
+                <Key>A</Key>
+                <Key>D</Key> steer
+              </span>
+              <span>
+                <Key>Shift</Key> faster
+              </span>
+              <span>mouse look</span>
+              <span>
+                <Key>E</Key> get out
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+      {touch && (
+        <button
+          onClick={onExit}
+          className="absolute right-4 top-20 rounded-full border-2 border-[#e7d7c1]/30 bg-[#101011]/80 px-4 py-2 text-sm backdrop-blur"
+        >
+          Get out
+        </button>
+      )}
+    </>
   );
 }
 

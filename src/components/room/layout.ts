@@ -11,6 +11,28 @@ export const WALL = 0.2;
 export const CINE = { cx: ROOM.halfX + WALL + 4.0, cz: 0, halfX: 4.0, halfZ: 3.6, height: 4.4 } as const;
 /** Opening in the shared wall, centred on z. */
 export const DOOR = { z: -0.68, width: 1.2, height: 2.3 } as const;
+/**
+ * Loading warehouse past the cine room's far wall. 40 × 25 m = 1000 m², tall enough for a pickup.
+ * The cine screening wall stays on the back half; this door is on the +z side of that wall.
+ */
+export const WARE = {
+  cx: CINE.cx + CINE.halfX + WALL + 20,
+  cz: 0,
+  halfX: 20,
+  halfZ: 12.5,
+  height: 8,
+} as const;
+/** Walk-through opening from the cine room into the warehouse. */
+export const GATE = { z: 2.45, width: 2.2, height: 2.6 } as const;
+/** RAM TRX parked just inside the warehouse, facing down the hall. */
+export const RAM_START = { x: CINE.cx + CINE.halfX + WALL + 8, z: 0, yaw: -Math.PI / 2 } as const;
+export const WARE_CRATES = [
+  { x: WARE.cx + 14, z: WARE.cz - 9, hw: 0.7, hd: 0.7, h: 1.2 },
+  { x: WARE.cx + 16, z: WARE.cz - 9.2, hw: 0.6, hd: 0.6, h: 1.0 },
+  { x: WARE.cx + 15, z: WARE.cz + 10, hw: 0.8, hd: 0.6, h: 1.4 },
+  { x: WARE.cx - 12, z: WARE.cz - 10, hw: 0.7, hd: 0.7, h: 1.1 },
+  { x: WARE.cx - 6, z: WARE.cz + 10.5, hw: 0.9, hd: 0.7, h: 1.3 },
+] as const;
 
 export const UNIT_WIDTH = 1.6;
 export const UNIT_DEPTH = 0.42;
