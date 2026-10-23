@@ -91,6 +91,10 @@ const CROUCH_EYE = 1.0;
 const BASE_FOV = 62;
 /** How quickly the view catches up with the mouse, per second. Higher is snappier. */
 const LOOK_EASE = 48;
+const CHASE_DIST = 9;
+const CHASE_HEIGHT = 3.2;
+const CHASE_LOOK = 4.5;
+const CHASE_EASE = 10;
 /** Pointer-lock movement larger than this in one event is a browser glitch, in pixels. */
 const MAX_MOUSE_STEP = 300;
 
@@ -688,6 +692,8 @@ function Player({
   const gl = useThree((s) => s.gl);
   const keys = useRef(new Set<string>());
   const look = useRef({ yaw: START.yaw as number, pitch: -0.06 as number });
+  const chaseDist = useRef(CHASE_DIST);
+  const chasePos = useRef(new THREE.Vector3());
   const hover = useRef<Target | null>(null);
   const walk = useRef(0);
   const crouch = useRef(false);
@@ -870,6 +876,11 @@ function Player({
       if (t) grab(t);
     };
     const onWheel = (e: WheelEvent) => {
+      if (live.current.driving) {
+        e.preventDefault();
+        chaseDist.current = THREE.MathUtils.clamp(chaseDist.current * (1 + e.deltaY * 0.001), 5.5, 16);
+        return;
+      }
       if (live.current.viewing) {
         e.preventDefault();
         live.current.onViewZoom(-e.deltaY * 0.0012);
@@ -940,9 +951,12 @@ function Player({
 
       if (!wasDriving.current) {
         look.current.yaw = car.yaw;
-        look.current.pitch = -0.06;
+        look.current.pitch = 0.32;
         smooth.current.yaw = car.yaw;
-        smooth.current.pitch = -0.06;
+        smooth.current.pitch = 0.32;
+        chaseDist.current = CHASE_DIST;
+        const back = chaseDist.current * Math.cos(0.32);
+        chasePos.current.set(car.x + Math.sin(car.yaw) * back, CHASE_HEIGHT, car.z + Math.cos(car.yaw) * back);
       }
       wasDriving.current = true;
       vel.current.set(0, 0, 0);
@@ -953,14 +967,23 @@ function Player({
       sm.pitch += (look.current.pitch - sm.pitch) * k;
       let rel = sm.yaw - car.yaw;
       rel = Math.atan2(Math.sin(rel), Math.cos(rel));
-      rel = THREE.MathUtils.clamp(rel, -1.15, 1.15);
+      rel = THREE.MathUtils.clamp(rel, -2.4, 2.4);
       look.current.yaw = car.yaw + rel;
       sm.yaw = car.yaw + rel;
-      sm.pitch = THREE.MathUtils.clamp(sm.pitch, -0.45, 0.55);
-      camera.rotation.set(sm.pitch, car.yaw + rel, 0, "YXZ");
-      const c = Math.cos(car.yaw);
-      const s = Math.sin(car.yaw);
-      camera.position.set(car.x + c * RAM.seat.x + s * RAM.seat.z, RAM.seat.y, car.z - s * RAM.seat.x + c * RAM.seat.z);
+      sm.pitch = THREE.MathUtils.clamp(sm.pitch, 0.1, 0.72);
+      look.current.pitch = sm.pitch;
+      const orbit = car.yaw + rel;
+      const dist = chaseDist.current;
+      const back = dist * Math.cos(sm.pitch);
+      const wantX = car.x + Math.sin(orbit) * back;
+      const wantZ = car.z + Math.cos(orbit) * back;
+      const wantY = THREE.MathUtils.clamp(1.2 + dist * Math.sin(sm.pitch), 1.6, 7.2);
+      const follow = 1 - Math.exp(-dt * CHASE_EASE);
+      chasePos.current.x += (wantX - chasePos.current.x) * follow;
+      chasePos.current.y += (wantY - chasePos.current.y) * follow;
+      chasePos.current.z += (wantZ - chasePos.current.z) * follow;
+      camera.position.copy(chasePos.current);
+      camera.lookAt(car.x - Math.sin(car.yaw) * CHASE_LOOK, 1.15, car.z - Math.cos(car.yaw) * CHASE_LOOK);
       if (hover.current) hoverSetter.current(null);
       return;
     }

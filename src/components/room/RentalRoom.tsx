@@ -521,7 +521,7 @@ function DriveHUD({ touch, onExit }: { touch: boolean; onExit: () => void }) {
               <span>
                 <Key>Shift</Key> faster
               </span>
-              <span>mouse look</span>
+              <span>mouse orbit · wheel zoom</span>
               <span>
                 <Key>E</Key> get out
               </span>
