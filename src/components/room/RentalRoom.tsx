@@ -399,9 +399,9 @@ function Intro({ progress, ready, onEnter, touch }: { progress: number; ready: b
         <p className="mt-2 font-display text-xl text-[#c0392b] sm:text-2xl">a rental shop you can walk through</p>
         <p className="mt-6 max-w-md text-[15px] leading-relaxed text-[#e7d7c1]/80">
           {LENSES.length} lenses on the shelves, from Sony G Masters to Sirui anamorphics. Cine glass and the cameras are in
-          the back room, through the door on the right. Keep going through the next door into the 1000 m² warehouse — a RAM TRX
-          is parked there. Sit in it with E and drive with WASD. Take a lens down, turn it in your hands, or pick up a Sony FX3
-          or a RED Komodo and look through it.
+          the back room, through the door on the right. Keep going through the next door into the warehouse — a hundred thousand
+          square metres, with a RAM TRX parked just inside. Sit in it with E and drive with WASD. Take a lens down, turn it in
+          your hands, or pick up a Sony FX3 or a RED Komodo and look through it.
         </p>
 
         <div className="mt-8 grid grid-cols-2 gap-x-8 gap-y-2 text-left text-sm text-[#e7d7c1]/80">
@@ -521,7 +521,7 @@ function DriveHUD({ touch, onExit }: { touch: boolean; onExit: () => void }) {
               <span>
                 <Key>Shift</Key> faster
               </span>
-              <span>mouse orbit · wheel zoom</span>
+              <span>mouse look</span>
               <span>
                 <Key>E</Key> get out
               </span>

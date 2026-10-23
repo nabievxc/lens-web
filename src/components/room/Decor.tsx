@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { APPLE_BOXES, ARMCHAIR, CHAIR, CINE, DOOR, GATE, ROOM, SOFTBOXES, WALL, WARE, WARE_CRATES } from "./layout";
-import { clockFace, concrete, neonTexture, plaster, printTexture, screenTexture, signTexture, woodGrain, type PrintKind } from "./roomTextures";
+import { clockFace, concrete, labelTexture, neonTexture, plaster, printTexture, screenTexture, signTexture, woodGrain, type PrintKind } from "./roomTextures";
 
 /** A wall plane standing on the floor, facing local +z, with an optional door cut out at local x. */
 export function Wall({
@@ -454,14 +454,44 @@ export function CineRoom() {
   );
 }
 
-/** 40 × 25 m loading hall with a RAM you can drive. */
+/** 400 × 250 m loading hall with a RAM you can drive. */
 export function Warehouse() {
   const { cx, cz, halfX: X, halfZ: Z, height: H } = WARE;
-  const floor = useMemo(() => concrete(), []);
+  const floor = useMemo(() => {
+    const t = concrete();
+    t.repeat.set(40, 25);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.needsUpdate = true;
+    return t;
+  }, []);
   const wallMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5c5852", roughness: 0.92 }), []);
-  const neon = useMemo(() => neonTexture("Warehouse", "1000 m² · RAM TRX"), []);
+  const neon = useMemo(() => neonTexture("Warehouse", "100 000 m² · RAM TRX"), []);
+  const ticks = useMemo(
+    () => [50, 100, 150, 200, 250, 300].map((n) => ({ n, tex: labelTexture(`${n} m`, "#d4af37", "wide") })),
+    [],
+  );
   const wood = useMemo(() => new THREE.MeshStandardMaterial({ color: "#8a6a3a", roughness: 0.75 }), []);
+  const steel = useMemo(() => new THREE.MeshStandardMaterial({ color: "#3a3d40", metalness: 0.55, roughness: 0.45 }), []);
   const left = cx - X;
+  const beams = useMemo(() => {
+    const z: number[] = [];
+    for (let v = cz - Z + 20; v < cz + Z - 10; v += 40) z.push(v);
+    return z;
+  }, [cz, Z]);
+  const bays = useMemo(() => {
+    const out: [number, number][] = [];
+    for (let x = cx - 160; x <= cx + 160; x += 80) {
+      for (let z = cz - 80; z <= cz + 80; z += 80) out.push([x, z]);
+    }
+    return out;
+  }, [cx, cz]);
+  const posts = useMemo(() => {
+    const out: [number, number][] = [];
+    for (let x = cx - 150; x <= cx + 150; x += 50) {
+      for (const z of [cz - 90, cz + 90]) out.push([x, z]);
+    }
+    return out;
+  }, [cx, cz]);
   return (
     <group>
       <mesh position={[cx, 0, cz]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -487,38 +517,47 @@ export function Warehouse() {
         door={{ x: cz - GATE.z, w: GATE.width, h: GATE.height }}
       />
 
-      {[-8, 0, 8].map((dz) => (
-        <mesh key={dz} position={[cx, H - 0.4, cz + dz]} rotation={[0, 0, Math.PI / 2]}>
-          <boxGeometry args={[0.35, X * 2, 0.35]} />
-          <meshStandardMaterial color="#3a3d40" metalness={0.6} roughness={0.45} />
+      <directionalLight position={[cx, 70, cz + 30]} intensity={1.45} color="#f3ead8" />
+      <hemisphereLight args={["#e8e0d2", "#6a645c", 0.55]} />
+      <pointLight position={[left + 10, 7, 0]} intensity={70} color="#f2e6c9" distance={45} decay={2} />
+
+      {beams.map((dz) => (
+        <mesh key={dz} position={[cx, H - 0.45, dz]} rotation={[0, 0, Math.PI / 2]} material={steel}>
+          <boxGeometry args={[0.4, X * 2, 0.4]} />
         </mesh>
       ))}
-      {[-12, -4, 4, 12].map((dx) => (
-        <group key={dx}>
-          <mesh position={[cx + dx, H - 1.15, cz]}>
-            <boxGeometry args={[1.4, 0.12, 1.4]} />
-            <meshStandardMaterial color="#3a3d40" metalness={0.5} roughness={0.4} />
+      {bays.map(([x, z]) => (
+        <group key={`${x}${z}`}>
+          <mesh position={[x, H - 1.2, z]} material={steel}>
+            <boxGeometry args={[1.6, 0.12, 1.6]} />
           </mesh>
-          <mesh position={[cx + dx, H - 1.22, cz]}>
-            <boxGeometry args={[0.9, 0.06, 0.9]} />
-            <meshBasicMaterial color={new THREE.Color(3.2, 2.9, 2.2)} toneMapped={false} />
+          <mesh position={[x, H - 1.28, z]}>
+            <boxGeometry args={[1.0, 0.06, 1.0]} />
+            <meshBasicMaterial color={new THREE.Color(3.1, 2.8, 2.1)} toneMapped={false} />
           </mesh>
         </group>
       ))}
+      {posts.map(([x, z]) => (
+        <mesh key={`${x}${z}`} position={[x, H / 2, z]} material={steel}>
+          <boxGeometry args={[0.45, H, 0.45]} />
+        </mesh>
+      ))}
 
-      <pointLight position={[cx - 6, 5.5, cz]} intensity={40} color="#f2e6c9" distance={28} decay={2} />
-      <pointLight position={[cx + 10, 5.5, cz - 4]} intensity={36} color="#e8f0ff" distance={28} decay={2} />
-
-      <mesh position={[cx, 5.2, cz + Z - 0.04]} rotation={[0, Math.PI, 0]}>
-        <planeGeometry args={[6.4, 1.1]} />
+      <mesh position={[left + 8, 3.4, GATE.z + 3.2]} rotation={[0, -0.35, 0]}>
+        <planeGeometry args={[7.2, 1.2]} />
         <meshBasicMaterial map={neon} transparent toneMapped={false} color={new THREE.Color(3.5, 3.5, 3.5)} depthWrite={false} />
       </mesh>
 
-      {/* Drive-lane paint */}
-      {[-6, 6].map((z) => (
-        <mesh key={z} position={[cx, 0.01, cz + z]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[X * 2 - 4, 0.12]} />
+      {[-8, 8].map((z) => (
+        <mesh key={z} position={[cx, 0.012, cz + z]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[X * 2 - 8, 0.18]} />
           <meshBasicMaterial color="#d4af37" />
+        </mesh>
+      ))}
+      {ticks.map(({ n, tex }) => (
+        <mesh key={n} position={[left + 20 + n, 0.02, cz]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+          <planeGeometry args={[4.5, 1.1]} />
+          <meshBasicMaterial map={tex} transparent toneMapped={false} />
         </mesh>
       ))}
       {WARE_CRATES.map((c, i) => (
