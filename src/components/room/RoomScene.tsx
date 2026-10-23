@@ -31,6 +31,7 @@ import {
   WALL,
   WARE,
   WARE_CRATES,
+  WARE_PROPS,
   roomLayout,
   type Slot,
   type Unit,
@@ -78,6 +79,7 @@ interface Props {
   driving: boolean;
   onHoverCar: (on: boolean) => void;
   onEnterCar: () => void;
+  onDriveSpeed?: (mps: number) => void;
 }
 
 const REACH = 3.5;
@@ -450,6 +452,7 @@ const OBSTACLES = [
   { x: APPLE_BOXES.x, z: APPLE_BOXES.z, hw: 0.3, hd: 0.2 },
   { x: ARMCHAIR.x, z: ARMCHAIR.z, hw: 0.45, hd: 0.45 },
   ...WARE_CRATES.map((c) => ({ x: c.x, z: c.z, hw: c.hw, hd: c.hd })),
+  ...WARE_PROPS.map((c) => ({ x: c.x, z: c.z, hw: c.hw, hd: c.hd })),
 ];
 
 /** Floor areas you can stand in: both rooms minus the shelf depth, joined by the doorway. */
@@ -552,7 +555,7 @@ function collideVehicle(v: VehiclePose) {
   v.z = THREE.MathUtils.clamp(v.z, WARE.cz - WARE.halfZ + pad, WARE.cz + WARE.halfZ - pad);
   VEH_TMP.set(v.x, 0, v.z);
   const r = 1.35;
-  for (const c of WARE_CRATES) {
+  for (const c of [...WARE_CRATES, ...WARE_PROPS]) {
     const cx = THREE.MathUtils.clamp(VEH_TMP.x, c.x - c.hw, c.x + c.hw);
     const cz = THREE.MathUtils.clamp(VEH_TMP.z, c.z - c.hd, c.z + c.hd);
     const dx = VEH_TMP.x - cx;
@@ -656,6 +659,7 @@ function Player({
   onGrabCam,
   onHoverCar,
   onEnterCar,
+  onDriveSpeed,
   onViewZoom,
   onLockChange,
   onLockError,
@@ -673,6 +677,7 @@ function Player({
   | "onGrabCam"
   | "onHoverCar"
   | "onEnterCar"
+  | "onDriveSpeed"
   | "onViewZoom"
   | "onLockChange"
   | "onLockError"
@@ -706,6 +711,7 @@ function Player({
     onGrabCam,
     onHoverCar,
     onEnterCar,
+    onDriveSpeed,
     onViewZoom,
     onLockChange,
     onLockError,
@@ -723,6 +729,7 @@ function Player({
     onGrabCam,
     onHoverCar,
     onEnterCar,
+    onDriveSpeed,
     onViewZoom,
     onLockChange,
     onLockError,
@@ -961,10 +968,23 @@ function Player({
       sm.yaw = car.yaw + rel;
       sm.pitch = THREE.MathUtils.clamp(sm.pitch, -0.38, 0.42);
       look.current.pitch = sm.pitch;
-      camera.rotation.set(sm.pitch, car.yaw + rel, 0, "YXZ");
+      const shake = Math.min(0.028, Math.abs(car.speed) * 0.0018);
+      const bounce = walk.current;
+      walk.current += dt * (8 + Math.abs(car.speed) * 1.4);
+      camera.rotation.set(sm.pitch + Math.sin(bounce * 1.7) * shake * 0.35, car.yaw + rel, Math.sin(bounce) * shake * 0.25, "YXZ");
       const c = Math.cos(car.yaw);
       const s = Math.sin(car.yaw);
-      camera.position.set(car.x + c * RAM.seat.x + s * RAM.seat.z, RAM.seat.y, car.z - s * RAM.seat.x + c * RAM.seat.z);
+      camera.position.set(
+        car.x + c * RAM.seat.x + s * RAM.seat.z,
+        RAM.seat.y + Math.sin(bounce * 2.1) * shake,
+        car.z - s * RAM.seat.x + c * RAM.seat.z,
+      );
+      fovGoal.current = 75 + Math.min(8, Math.abs(car.speed) * 0.4);
+      if (Math.abs(camera.fov - fovGoal.current) > 0.01) {
+        camera.fov = THREE.MathUtils.lerp(camera.fov, fovGoal.current, 1 - Math.exp(-dt * 8));
+        camera.updateProjectionMatrix();
+      }
+      live.current.onDriveSpeed?.(car.speed);
       if (hover.current) hoverSetter.current(null);
       return;
     }
@@ -1552,6 +1572,7 @@ function Scene(props: Props & { hovered: Slot | null }) {
         onGrabCam={props.onGrabCam}
         onHoverCar={props.onHoverCar}
         onEnterCar={props.onEnterCar}
+        onDriveSpeed={props.onDriveSpeed}
         onViewZoom={props.onViewZoom}
         onLockChange={props.onLockChange}
         onLockError={props.onLockError}
@@ -1586,8 +1607,8 @@ export default function RoomScene(props: Props & { hovered: Slot | null }) {
       gl={{ antialias: false, stencil: false, powerPreference: "high-performance" }}
       className="!fixed inset-0 touch-none"
     >
-      <color attach="background" args={["#101011"]} />
-      <fog attach="fog" args={["#3e3b36", 70, 420]} />
+      <color attach="background" args={["#12141a"]} />
+      <fog attach="fog" args={["#1c1a18", 40, 260]} />
       <Scene {...props} />
     </Canvas>
   );

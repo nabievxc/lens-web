@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useRef } from "react";
+import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import { RoundedBox } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -133,7 +133,7 @@ function useMats() {
       roughness: 0.04,
       metalness: 0.15,
       transparent: true,
-      opacity: 0.07,
+      opacity: 0.035,
       side: THREE.DoubleSide,
       fog: false,
     });
@@ -185,6 +185,28 @@ function Wheel({ m, radius = RAM.wheelR }: { m: Mats; radius?: number }) {
         </group>
       ))}
     </group>
+  );
+}
+
+function Headlamp({ x }: { x: number }) {
+  const light = useRef<THREE.SpotLight>(null);
+  useLayoutEffect(() => {
+    const l = light.current;
+    if (!l) return;
+    l.target.position.set(x, 0.12, -32);
+    l.parent?.add(l.target);
+  }, [x]);
+  return (
+    <spotLight
+      ref={light}
+      position={[x, 0.84, -2.72]}
+      angle={0.46}
+      penumbra={0.62}
+      intensity={280}
+      distance={95}
+      decay={2}
+      color="#ffe4b8"
+    />
   );
 }
 
@@ -328,6 +350,8 @@ export const RamTruck = memo(function RamTruck({ pose }: { pose: React.RefObject
           <boxGeometry args={[0.16, 0.08, 0.05]} />
         </mesh>
       ))}
+      <Headlamp x={-0.72} />
+      <Headlamp x={0.72} />
 
       {/* Bed */}
       <mesh position={[0, 0.88, 1.62]} material={m.black}>

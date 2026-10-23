@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { APPLE_BOXES, ARMCHAIR, CHAIR, CINE, DOOR, GATE, ROOM, SOFTBOXES, WALL, WARE, WARE_CRATES } from "./layout";
+import { APPLE_BOXES, ARMCHAIR, CHAIR, CINE, DOOR, GATE, RAM_START, ROOM, SOFTBOXES, WALL, WARE, WARE_CRATES, WARE_DOCKS, WARE_PROPS } from "./layout";
 import { clockFace, concrete, labelTexture, neonTexture, plaster, printTexture, screenTexture, signTexture, woodGrain, type PrintKind } from "./roomTextures";
 
 /** A wall plane standing on the floor, facing local +z, with an optional door cut out at local x. */
@@ -454,7 +454,135 @@ export function CineRoom() {
   );
 }
 
-/** 400 × 250 m loading hall with a RAM you can drive. */
+const DOCK_W = 12;
+const DOCK_H = 5.4;
+
+function DockBay({ x, z, rot }: { x: number; z: number; rot: number }) {
+  const steel = useMemo(() => new THREE.MeshStandardMaterial({ color: "#2e3236", metalness: 0.55, roughness: 0.4 }), []);
+  return (
+    <group position={[x, 0, z]} rotation={[0, rot, 0]}>
+      <mesh position={[0, DOCK_H / 2, -0.9]}>
+        <planeGeometry args={[DOCK_W, DOCK_H]} />
+        <meshBasicMaterial color="#0a1020" fog={false} />
+      </mesh>
+      <mesh position={[0, 0.55, -0.85]}>
+        <planeGeometry args={[DOCK_W, 0.7]} />
+        <meshBasicMaterial color="#c45a18" fog={false} />
+      </mesh>
+      {[
+        [-3.2, 2.4],
+        [-1.1, 1.8],
+        [1.4, 2.1],
+        [3.4, 1.6],
+      ].map(([lx, ly]) => (
+        <mesh key={`${lx}${ly}`} position={[lx, ly, -0.86]}>
+          <planeGeometry args={[0.35, 0.7]} />
+          <meshBasicMaterial color="#e8c878" />
+        </mesh>
+      ))}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (DOCK_W / 2 + 0.12), DOCK_H / 2, 0.04]} material={steel}>
+          <boxGeometry args={[0.24, DOCK_H + 0.2, 0.28]} />
+        </mesh>
+      ))}
+      <mesh position={[0, DOCK_H + 0.12, 0.04]} material={steel}>
+        <boxGeometry args={[DOCK_W + 0.48, 0.24, 0.28]} />
+      </mesh>
+      <mesh position={[0, DOCK_H + 0.42, 0.02]} rotation={[Math.PI / 2, 0, 0]} material={steel}>
+        <cylinderGeometry args={[0.16, 0.16, DOCK_W + 0.2, 10]} />
+      </mesh>
+      <pointLight position={[0, 4.2, 2.2]} intensity={14} distance={22} decay={2} color="#d8a060" />
+    </group>
+  );
+}
+
+function TrafficCone({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      <mesh position={[0, 0.04, 0]}>
+        <cylinderGeometry args={[0.16, 0.16, 0.04, 10]} />
+        <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 0.28, 0]}>
+        <cylinderGeometry args={[0.05, 0.14, 0.5, 10]} />
+        <meshStandardMaterial color="#e24a12" roughness={0.45} />
+      </mesh>
+      <mesh position={[0, 0.34, 0]}>
+        <cylinderGeometry args={[0.075, 0.1, 0.08, 10]} />
+        <meshStandardMaterial color="#f4f0e8" roughness={0.6} />
+      </mesh>
+    </group>
+  );
+}
+
+function RoadCase({ x, z, h }: { x: number; z: number; h: number }) {
+  const tex = useMemo(() => labelTexture("LENS", "#d4af37", "wide"), []);
+  return (
+    <group position={[x, h / 2, z]}>
+      <mesh>
+        <boxGeometry args={[1.1, h, 0.8]} />
+        <meshStandardMaterial color="#1a1c1e" roughness={0.55} metalness={0.2} />
+      </mesh>
+      <mesh position={[0, 0.02, 0.41]} rotation={[0, 0, 0]}>
+        <planeGeometry args={[0.7, 0.16]} />
+        <meshBasicMaterial map={tex} transparent toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function Forklift({ x, z }: { x: number; z: number }) {
+  const body = useMemo(() => new THREE.MeshStandardMaterial({ color: "#c9a227", roughness: 0.45, metalness: 0.2 }), []);
+  const dark = useMemo(() => new THREE.MeshStandardMaterial({ color: "#1c1d20", roughness: 0.5 }), []);
+  return (
+    <group position={[x, 0, z]} rotation={[0, Math.PI / 2, 0]}>
+      <mesh position={[0, 0.7, 0.1]} material={body}>
+        <boxGeometry args={[1.15, 1.15, 1.7]} />
+      </mesh>
+      <mesh position={[0, 1.45, -0.15]} material={dark}>
+        <boxGeometry args={[1.05, 0.45, 0.9]} />
+      </mesh>
+      <mesh position={[0, 0.95, -1.15]} material={dark}>
+        <boxGeometry args={[0.08, 1.6, 0.08]} />
+      </mesh>
+      <mesh position={[0.22, 0.95, -1.15]} material={dark}>
+        <boxGeometry args={[0.08, 1.6, 0.08]} />
+      </mesh>
+      <mesh position={[0.1, 0.18, -1.45]} material={dark}>
+        <boxGeometry args={[0.7, 0.08, 0.5]} />
+      </mesh>
+      {([-0.42, 0.42] as const).map((s) => (
+        <mesh key={s} position={[s, 0.22, 0.35]} rotation={[0, 0, Math.PI / 2]} material={dark}>
+          <cylinderGeometry args={[0.22, 0.22, 0.18, 10]} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function StallMark({ x, z }: { x: number; z: number }) {
+  const paint = "#f2efe6";
+  const len = 7.2;
+  const wid = 3.1;
+  return (
+    <group position={[x, 0.015, z]}>
+      {([-wid / 2, wid / 2] as const).map((s) => (
+        <mesh key={s} position={[0, 0, s]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[len, 0.08]} />
+          <meshBasicMaterial color={paint} />
+        </mesh>
+      ))}
+      {([-len / 2, len / 2] as const).map((s) => (
+        <mesh key={s} position={[s, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.08, wid]} />
+          <meshBasicMaterial color={paint} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/** 400 × 250 m night loading hall with a RAM you can drive. */
 export function Warehouse() {
   const { cx, cz, halfX: X, halfZ: Z, height: H } = WARE;
   const floor = useMemo(() => {
@@ -464,8 +592,8 @@ export function Warehouse() {
     t.needsUpdate = true;
     return t;
   }, []);
-  const wallMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5c5852", roughness: 0.92 }), []);
-  const neon = useMemo(() => neonTexture("Warehouse", "100 000 m² · RAM TRX"), []);
+  const wallMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#3a3834", roughness: 0.92 }), []);
+  const neon = useMemo(() => neonTexture("Warehouse", "NIGHT · 100 000 m² · RAM TRX"), []);
   const ticks = useMemo(
     () => [50, 100, 150, 200, 250, 300].map((n) => ({ n, tex: labelTexture(`${n} m`, "#d4af37", "wide") })),
     [],
@@ -473,6 +601,15 @@ export function Warehouse() {
   const wood = useMemo(() => new THREE.MeshStandardMaterial({ color: "#8a6a3a", roughness: 0.75 }), []);
   const steel = useMemo(() => new THREE.MeshStandardMaterial({ color: "#3a3d40", metalness: 0.55, roughness: 0.45 }), []);
   const left = cx - X;
+  const right = cx + X;
+  const back = cz - Z;
+  const dockCuts = WARE_DOCKS.map((x) => ({ a: x - DOCK_W / 2, b: x + DOCK_W / 2 }));
+  const wallSpans = useMemo(() => {
+    const edges = [left, ...dockCuts.flatMap((d) => [d.a, d.b]), right];
+    const spans: [number, number][] = [];
+    for (let i = 0; i < edges.length; i += 2) spans.push([edges[i], edges[i + 1]]);
+    return spans;
+  }, [left, right]);
   const beams = useMemo(() => {
     const z: number[] = [];
     for (let v = cz - Z + 20; v < cz + Z - 10; v += 40) z.push(v);
@@ -496,30 +633,42 @@ export function Warehouse() {
     <group>
       <mesh position={[cx, 0, cz]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[X * 2, Z * 2]} />
-        <meshStandardMaterial map={floor} color="#7a7670" roughness={0.55} />
+        <meshStandardMaterial map={floor} color="#4a4640" roughness={0.62} />
       </mesh>
       <mesh position={[cx, H, cz]} rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[X * 2, Z * 2]} />
-        <meshStandardMaterial color="#2a2c2e" roughness={0.9} />
+        <meshStandardMaterial color="#141618" roughness={0.9} />
       </mesh>
 
-      <Wall pos={[cx, 0, cz - Z]} rot={0} width={X * 2} height={H} material={wallMat} skirting="#2a2a2a" crown="#2a2a2a" />
-      <Wall pos={[cx, 0, cz + Z]} rot={Math.PI} width={X * 2} height={H} material={wallMat} skirting="#2a2a2a" crown="#2a2a2a" />
-      <Wall pos={[cx + X, 0, cz]} rot={-Math.PI / 2} width={Z * 2} height={H} material={wallMat} skirting="#2a2a2a" crown="#2a2a2a" />
+      {wallSpans.map(([a, b]) => (
+        <Wall key={`${a}${b}`} pos={[(a + b) / 2, 0, back]} rot={0} width={b - a} height={H} material={wallMat} skirting="#1a1a1a" crown="#1a1a1a" />
+      ))}
+      {WARE_DOCKS.map((x) => (
+        <mesh key={`lintel${x}`} position={[x, (H + DOCK_H) / 2, back]}>
+          <planeGeometry args={[DOCK_W, H - DOCK_H]} />
+          <meshStandardMaterial color="#3a3834" roughness={0.92} />
+        </mesh>
+      ))}
+      {WARE_DOCKS.map((x) => (
+        <DockBay key={x} x={x} z={back} rot={0} />
+      ))}
+
+      <Wall pos={[cx, 0, cz + Z]} rot={Math.PI} width={X * 2} height={H} material={wallMat} skirting="#1a1a1a" crown="#1a1a1a" />
+      <Wall pos={[cx + X, 0, cz]} rot={-Math.PI / 2} width={Z * 2} height={H} material={wallMat} skirting="#1a1a1a" crown="#1a1a1a" />
       <Wall
         pos={[left, 0, cz]}
         rot={Math.PI / 2}
         width={Z * 2}
         height={H}
         material={wallMat}
-        skirting="#2a2a2a"
-        crown="#2a2a2a"
+        skirting="#1a1a1a"
+        crown="#1a1a1a"
         door={{ x: cz - GATE.z, w: GATE.width, h: GATE.height }}
       />
 
-      <directionalLight position={[cx, 70, cz + 30]} intensity={1.45} color="#f3ead8" />
-      <hemisphereLight args={["#e8e0d2", "#6a645c", 0.55]} />
-      <pointLight position={[left + 10, 7, 0]} intensity={70} color="#f2e6c9" distance={45} decay={2} />
+      <hemisphereLight args={["#6a7a92", "#1a1612", 0.22]} />
+      <directionalLight position={[cx, 80, cz - 40]} intensity={0.22} color="#8aa0c0" />
+      <pointLight position={[left + 8, 5.5, 0]} intensity={28} color="#f0d2a0" distance={28} decay={2} />
 
       {beams.map((dz) => (
         <mesh key={dz} position={[cx, H - 0.45, dz]} rotation={[0, 0, Math.PI / 2]} material={steel}>
@@ -533,14 +682,20 @@ export function Warehouse() {
           </mesh>
           <mesh position={[x, H - 1.28, z]}>
             <boxGeometry args={[1.0, 0.06, 1.0]} />
-            <meshBasicMaterial color={new THREE.Color(3.1, 2.8, 2.1)} toneMapped={false} />
+            <meshBasicMaterial color={new THREE.Color(0.7, 0.55, 0.32)} toneMapped={false} />
           </mesh>
         </group>
       ))}
       {posts.map(([x, z]) => (
-        <mesh key={`${x}${z}`} position={[x, H / 2, z]} material={steel}>
-          <boxGeometry args={[0.45, H, 0.45]} />
-        </mesh>
+        <group key={`${x}${z}`}>
+          <mesh position={[x, H / 2, z]} material={steel}>
+            <boxGeometry args={[0.45, H, 0.45]} />
+          </mesh>
+          <mesh position={[x, 0.7, z]}>
+            <boxGeometry args={[0.48, 0.35, 0.48]} />
+            <meshStandardMaterial color="#c9a227" roughness={0.5} />
+          </mesh>
+        </group>
       ))}
 
       <mesh position={[left + 8, 3.4, GATE.z + 3.2]} rotation={[0, -0.35, 0]}>
@@ -560,10 +715,31 @@ export function Warehouse() {
           <meshBasicMaterial map={tex} transparent toneMapped={false} />
         </mesh>
       ))}
+      {[40, 90, 140, 200].map((d) => (
+        <mesh key={d} position={[left + d, 0.018, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
+          <planeGeometry args={[1.6, 0.7]} />
+          <meshBasicMaterial color="#d4af37" />
+        </mesh>
+      ))}
       {WARE_CRATES.map((c, i) => (
         <mesh key={i} position={[c.x, c.h / 2, c.z]} material={wood}>
           <boxGeometry args={[c.hw * 2, c.h, c.hd * 2]} />
         </mesh>
+      ))}
+      {WARE_PROPS.slice(0, 3).map((p) => (
+        <RoadCase key={`${p.x}${p.z}`} x={p.x} z={p.z} h={p.h} />
+      ))}
+      <Forklift x={WARE_PROPS[3].x} z={WARE_PROPS[3].z} />
+      <StallMark x={RAM_START.x + 0.4} z={RAM_START.z} />
+      {[
+        [left + 6, 3.2],
+        [left + 6.6, 3.8],
+        [left + 7.2, -3.4],
+        [left + 12, -3.6],
+        [RAM_START.x - 1.2, -2.2],
+        [RAM_START.x - 1.2, 2.2],
+      ].map(([x, z]) => (
+        <TrafficCone key={`${x}${z}`} position={[x, 0, z]} />
       ))}
     </group>
   );

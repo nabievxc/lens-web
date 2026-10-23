@@ -24,6 +24,7 @@ import {
   type CameraId,
 } from "./cameras";
 import type { Lens } from "@/types/lens";
+import { startEngineHum, type EngineHum } from "@/lib/engineHum";
 
 const RoomScene = dynamic(() => import("./RoomScene"), { ssr: false });
 
@@ -50,6 +51,9 @@ export function RentalRoom() {
   const [aspect, setAspect] = useState(16 / 9);
   const [hoverCar, setHoverCar] = useState(false);
   const [driving, setDriving] = useState(false);
+  const [driveSpeed, setDriveSpeed] = useState(0);
+  const driveSpeedRef = useRef(0);
+  const engine = useRef<EngineHum | null>(null);
 
   const bag = useRental();
   const targets = useRef<SceneTargets>({ zoom: 0, focus: 1, closed: 0, demo: false });
@@ -138,12 +142,31 @@ export function RentalRoom() {
   const enterCar = useCallback(() => {
     setHoverCar(false);
     setDriving(true);
+    engine.current?.stop();
+    engine.current = startEngineHum();
   }, []);
 
   const exitCar = useCallback(() => {
     setDriving(false);
+    setDriveSpeed(0);
+    engine.current?.stop();
+    engine.current = null;
     if (!window.matchMedia("(pointer: coarse)").matches) controls.current?.lock();
   }, []);
+
+  const onDriveSpeed = useCallback((mps: number) => {
+    driveSpeedRef.current = mps;
+    engine.current?.setSpeed(mps);
+  }, []);
+
+  useEffect(() => {
+    if (!driving) return;
+    const id = window.setInterval(() => {
+      const next = driveSpeedRef.current;
+      setDriveSpeed((prev) => (Math.abs(prev - next) > 0.15 ? next : prev));
+    }, 160);
+    return () => window.clearInterval(id);
+  }, [driving]);
 
   const setViewfinder = useCallback((on: boolean) => {
     setViewing(on);
@@ -240,6 +263,7 @@ export function RentalRoom() {
           driving={driving}
           onHoverCar={setHoverCar}
           onEnterCar={enterCar}
+          onDriveSpeed={onDriveSpeed}
         />
       )}
 
@@ -252,7 +276,7 @@ export function RentalRoom() {
       {inside && !busy && !viewing && hovered && <HoverTag slot={hovered} />}
       {inside && !busy && !viewing && hoverCam && <CameraTag id={hoverCam} />}
       {inside && !busy && !viewing && hoverCar && <CarTag />}
-      {inside && driving && <DriveHUD touch={dragMode} onExit={exitCar} />}
+      {inside && driving && <DriveHUD touch={dragMode} speed={driveSpeed} onExit={exitCar} />}
 
       {inside && heldCam && viewing && (
         <ViewfinderHUD
@@ -399,8 +423,8 @@ function Intro({ progress, ready, onEnter, touch }: { progress: number; ready: b
         <p className="mt-2 font-display text-xl text-[#c0392b] sm:text-2xl">a rental shop you can walk through</p>
         <p className="mt-6 max-w-md text-[15px] leading-relaxed text-[#e7d7c1]/80">
           {LENSES.length} lenses on the shelves, from Sony G Masters to Sirui anamorphics. Cine glass and the cameras are in
-          the back room, through the door on the right. Keep going through the next door into the warehouse — a hundred thousand
-          square metres, with a RAM TRX parked just inside. Sit in it with E and drive with WASD. Take a lens down, turn it in
+          the back room, through the door on the right. Keep going through the next door into the night warehouse — a hundred
+          thousand square metres. Sit in the RAM with E; the headlights cut the hall. Drive with WASD. Take a lens down, turn it in
           your hands, or pick up a Sony FX3 or a RED Komodo and look through it.
         </p>
 
@@ -502,9 +526,14 @@ function CarTag() {
   );
 }
 
-function DriveHUD({ touch, onExit }: { touch: boolean; onExit: () => void }) {
+function DriveHUD({ touch, speed, onExit }: { touch: boolean; speed: number; onExit: () => void }) {
+  const kph = Math.max(0, Math.round(Math.abs(speed) * 3.6));
   return (
     <>
+      <div className="pointer-events-none absolute bottom-20 left-1/2 -translate-x-1/2 font-display text-4xl tabular-nums text-[#e7d7c1]/90">
+        {kph}
+        <span className="ml-2 font-sans text-[11px] tracking-[0.2em] text-[#e7d7c1]/50">KM/H</span>
+      </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center">
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded-full bg-[#101011]/75 px-5 py-2 text-xs text-[#e7d7c1]/85 backdrop-blur">
           {touch ? (

@@ -26,18 +26,27 @@ export const WARE = {
 export const GATE = { z: 2.45, width: 2.2, height: 2.6 } as const;
 /** RAM TRX parked just inside the warehouse, facing down the hall. */
 export const RAM_START = { x: CINE.cx + CINE.halfX + WALL + 10, z: 0, yaw: -Math.PI / 2 } as const;
+const WARE_DOOR = CINE.cx + CINE.halfX + WALL;
 export const WARE_CRATES = [
-  { x: CINE.cx + CINE.halfX + WALL + 18, z: -8, hw: 0.8, hd: 0.7, h: 1.2 },
-  { x: CINE.cx + CINE.halfX + WALL + 20, z: -8.4, hw: 0.6, hd: 0.6, h: 1.0 },
-  { x: CINE.cx + CINE.halfX + WALL + 22, z: 9, hw: 0.9, hd: 0.7, h: 1.4 },
-  { x: CINE.cx + CINE.halfX + WALL + 55, z: -18, hw: 1.1, hd: 0.9, h: 1.5 },
-  { x: CINE.cx + CINE.halfX + WALL + 90, z: 22, hw: 1.3, hd: 1.0, h: 1.7 },
-  { x: CINE.cx + CINE.halfX + WALL + 140, z: -28, hw: 1.4, hd: 1.1, h: 1.8 },
+  { x: WARE_DOOR + 18, z: -8, hw: 0.8, hd: 0.7, h: 1.2 },
+  { x: WARE_DOOR + 20, z: -8.4, hw: 0.6, hd: 0.6, h: 1.0 },
+  { x: WARE_DOOR + 22, z: 9, hw: 0.9, hd: 0.7, h: 1.4 },
+  { x: WARE_DOOR + 55, z: -18, hw: 1.1, hd: 0.9, h: 1.5 },
+  { x: WARE_DOOR + 90, z: 22, hw: 1.3, hd: 1.0, h: 1.7 },
+  { x: WARE_DOOR + 140, z: -28, hw: 1.4, hd: 1.1, h: 1.8 },
   { x: WARE.cx - 40, z: WARE.cz - 40, hw: 1.2, hd: 1.0, h: 1.6 },
   { x: WARE.cx + 60, z: WARE.cz + 50, hw: 1.4, hd: 1.1, h: 1.8 },
   { x: WARE.cx + 80, z: WARE.cz - 70, hw: 1.1, hd: 0.9, h: 1.5 },
   { x: WARE.cx + 120, z: WARE.cz + 80, hw: 1.6, hd: 1.2, h: 2.0 },
 ] as const;
+/** Extra warehouse blockers: road cases and a forklift, kept off the drive lane. */
+export const WARE_PROPS = [
+  { x: WARE_DOOR + 16, z: -11.2, hw: 0.55, hd: 0.4, h: 0.7 },
+  { x: WARE_DOOR + 17.3, z: -11.2, hw: 0.55, hd: 0.4, h: 0.7 },
+  { x: WARE_DOOR + 18.6, z: -11.2, hw: 0.55, hd: 0.4, h: 0.7 },
+  { x: WARE_DOOR + 38, z: 16.5, hw: 1.15, hd: 0.7, h: 2.1 },
+] as const;
+export const WARE_DOCKS = [WARE_DOOR + 72, WARE_DOOR + 168] as const;
 
 export const UNIT_WIDTH = 1.6;
 export const UNIT_DEPTH = 0.42;
